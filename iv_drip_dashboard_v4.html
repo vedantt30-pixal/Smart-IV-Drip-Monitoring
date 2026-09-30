@@ -1,0 +1,3896 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>MedFlow ICU — IV Drip Monitoring System</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" href="data:," />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+    <style>
+      /* ============================================================
+   ROOT VARIABLES — Light & Dark Themes
+   ============================================================ */
+      :root {
+        --bg: #f0f3f8;
+        --bg2: #e6eaf3;
+        --surface: #ffffff;
+        --surface2: #f5f7fc;
+        --surface3: #edf0f8;
+        --border: #dde3f0;
+        --border2: #c8d1e8;
+
+        --primary: #1a56db;
+        --primary-hover: #1547c0;
+        --primary-light: #e8eeff;
+        --primary-dim: #c0ccf5;
+
+        --ok: #0d9f5a;
+        --ok-bg: #e8faf2;
+        --ok-border: #a3e8c8;
+        --ok-dim: #d1f5e5;
+
+        --warn: #c9700a;
+        --warn-bg: #fff5e6;
+        --warn-border: #ffd49b;
+        --warn-dim: #ffe8c0;
+
+        --crit: #c9202a;
+        --crit-bg: #fff0f0;
+        --crit-border: #ffb3b3;
+        --crit-dim: #ffd6d6;
+
+        --offline: #6b7280;
+        --offline-bg: #f3f4f6;
+        --offline-border: #d1d5db;
+
+        --text: #0f1629;
+        --text2: #374151;
+        --muted: #6b7fa0;
+        --muted2: #9aa6bf;
+
+        --sidebar-w: 260px;
+        --sidebar-collapsed: 72px;
+        --topbar-h: 68px;
+
+        --shadow-xs: 0 1px 3px rgba(15, 22, 41, 0.07);
+        --shadow-sm: 0 2px 8px rgba(15, 22, 41, 0.09);
+        --shadow-md: 0 4px 20px rgba(15, 22, 41, 0.11);
+        --shadow-lg: 0 8px 40px rgba(15, 22, 41, 0.16);
+
+        --radius-sm: 10px;
+        --radius-md: 16px;
+        --radius-lg: 22px;
+
+        --font: "DM Sans", sans-serif;
+        --mono: "IBM Plex Mono", monospace;
+
+        --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      [data-dark] {
+        --bg: #080d18;
+        --bg2: #0c1220;
+        --surface: #111827;
+        --surface2: #1a2236;
+        --surface3: #1f2a40;
+        --border: #253047;
+        --border2: #2d3a55;
+
+        --primary: #4a7cf5;
+        --primary-hover: #3b6de8;
+        --primary-light: #1a254a;
+        --primary-dim: #2a3a6a;
+
+        --ok: #22c575;
+        --ok-bg: #0a1f16;
+        --ok-border: #165c37;
+        --ok-dim: #0f2c20;
+
+        --warn: #f5a623;
+        --warn-bg: #1f1600;
+        --warn-border: #5c3d00;
+        --warn-dim: #2a1f00;
+
+        --crit: #ff4d4d;
+        --crit-bg: #1f0808;
+        --crit-border: #7a1f1f;
+        --crit-dim: #2a0f0f;
+
+        --offline: #9ca3af;
+        --offline-bg: #1f2937;
+        --offline-border: #374151;
+
+        --text: #e8edf8;
+        --text2: #c5cede;
+        --muted: #6b7fa0;
+        --muted2: #4a5568;
+
+        --shadow-xs: 0 1px 3px rgba(0, 0, 0, 0.3);
+        --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
+        --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.5);
+        --shadow-lg: 0 8px 40px rgba(0, 0, 0, 0.6);
+      }
+
+      /* ============================================================
+   RESET & BASE
+   ============================================================ */
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html {
+        font-size: 15px;
+      }
+      body {
+        font-family: var(--font);
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+        transition:
+          background 0.35s,
+          color 0.35s;
+        overflow-x: hidden;
+      }
+      button {
+        font-family: var(--font);
+        cursor: pointer;
+      }
+      ::-webkit-scrollbar {
+        width: 5px;
+        height: 5px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--border2);
+        border-radius: 3px;
+      }
+
+      /* ============================================================
+   APP SHELL
+   ============================================================ */
+      .app {
+        display: flex;
+        min-height: 100vh;
+      }
+
+      /* ============================================================
+   SIDEBAR
+   ============================================================ */
+      .sidebar {
+        width: var(--sidebar-w);
+        background: var(--surface);
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        z-index: 200;
+        transition:
+          width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+          background 0.35s,
+          border 0.35s;
+        overflow: hidden;
+      }
+      .sidebar.collapsed {
+        width: var(--sidebar-collapsed);
+      }
+      .sidebar-inner {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        width: var(--sidebar-w);
+        min-width: var(--sidebar-w);
+      }
+
+      /* Logo */
+      .sidebar-logo {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 20px 16px 18px;
+        border-bottom: 1px solid var(--border);
+        flex-shrink: 0;
+        text-decoration: none;
+      }
+      .logo-icon {
+        width: 40px;
+        height: 40px;
+        background: linear-gradient(135deg, #1a56db, #4a7cf5);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        box-shadow: 0 4px 12px rgba(26, 86, 219, 0.3);
+      }
+      .logo-text {
+        overflow: hidden;
+      }
+      .logo-text strong {
+        display: block;
+        font-size: 0.92rem;
+        font-weight: 700;
+        color: var(--text);
+        white-space: nowrap;
+      }
+      .logo-text span {
+        display: block;
+        font-size: 0.68rem;
+        color: var(--muted);
+        font-weight: 500;
+        white-space: nowrap;
+        margin-top: 1px;
+      }
+
+      /* Toggle */
+      .sidebar-toggle {
+        position: absolute;
+        top: 20px;
+        right: -13px;
+        width: 26px;
+        height: 26px;
+        background: var(--surface);
+        border: 1.5px solid var(--border);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--muted);
+        transition: var(--transition);
+        box-shadow: var(--shadow-sm);
+        z-index: 10;
+      }
+      .sidebar-toggle:hover {
+        background: var(--primary);
+        color: #fff;
+        border-color: var(--primary);
+      }
+      .sidebar-toggle svg {
+        transition: transform 0.3s;
+      }
+      .sidebar.collapsed .sidebar-toggle svg {
+        transform: rotate(180deg);
+      }
+
+      /* Nav */
+      .nav-section {
+        padding: 14px 10px 6px;
+        flex-shrink: 0;
+      }
+      .nav-label {
+        font-size: 0.62rem;
+        font-weight: 700;
+        color: var(--muted2);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        padding: 0 6px 8px;
+        white-space: nowrap;
+        overflow: hidden;
+        transition: opacity 0.2s;
+      }
+      .sidebar.collapsed .nav-label {
+        opacity: 0;
+      }
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 12px;
+        border-radius: var(--radius-sm);
+        color: var(--muted);
+        font-size: 0.84rem;
+        font-weight: 500;
+        cursor: pointer;
+        border: none;
+        background: transparent;
+        width: 100%;
+        text-align: left;
+        position: relative;
+        transition: var(--transition);
+        white-space: nowrap;
+        text-decoration: none;
+      }
+      .nav-item:hover {
+        background: var(--surface2);
+        color: var(--text);
+      }
+      .nav-item.active {
+        background: var(--primary-light);
+        color: var(--primary);
+        font-weight: 600;
+      }
+      .nav-item.active::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 3px;
+        height: 20px;
+        background: var(--primary);
+        border-radius: 0 3px 3px 0;
+      }
+      .nav-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+      .nav-item.active .nav-icon {
+        background: var(--primary);
+        color: #fff;
+      }
+      .nav-item:not(.active):hover .nav-icon {
+        background: var(--surface3);
+      }
+      .nav-text {
+        overflow: hidden;
+        transition: opacity 0.2s;
+      }
+      .sidebar.collapsed .nav-text {
+        opacity: 0;
+      }
+      .nav-badge {
+        margin-left: auto;
+        background: var(--crit-bg);
+        color: var(--crit);
+        border: 1px solid var(--crit-border);
+        border-radius: 999px;
+        padding: 1px 7px;
+        font-size: 0.65rem;
+        font-weight: 700;
+        flex-shrink: 0;
+        transition: opacity 0.2s;
+      }
+      .sidebar.collapsed .nav-badge {
+        opacity: 0;
+      }
+
+      /* Sidebar tooltip */
+      .nav-item[data-tip]:hover::after {
+        content: attr(data-tip);
+        position: absolute;
+        left: calc(100% + 12px);
+        top: 50%;
+        transform: translateY(-50%);
+        background: var(--text);
+        color: var(--surface);
+        padding: 5px 10px;
+        border-radius: 8px;
+        font-size: 0.76rem;
+        white-space: nowrap;
+        pointer-events: none;
+        z-index: 999;
+        opacity: 0;
+        animation: tipFade 0.15s 0.3s forwards;
+      }
+      @keyframes tipFade {
+        to {
+          opacity: 1;
+        }
+      }
+      .sidebar:not(.collapsed) .nav-item[data-tip]:hover::after {
+        display: none;
+      }
+
+      /* Sidebar footer */
+      .sidebar-footer {
+        margin-top: auto;
+        padding: 14px 10px;
+        border-top: 1px solid var(--border);
+        flex-shrink: 0;
+      }
+      .user-card {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        padding: 10px 12px;
+        background: var(--surface2);
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border);
+        cursor: pointer;
+        transition: var(--transition);
+        overflow: hidden;
+      }
+      .user-card:hover {
+        background: var(--surface3);
+      }
+      .user-av {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, #4a7cf5, #38bdf8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.8rem;
+        color: #fff;
+        flex-shrink: 0;
+      }
+      .user-info {
+        overflow: hidden;
+      }
+      .user-info strong {
+        display: block;
+        font-size: 0.8rem;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+      .user-info span {
+        display: block;
+        font-size: 0.67rem;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+      .sidebar.collapsed .user-info {
+        opacity: 0;
+      }
+
+      /* ============================================================
+   MAIN CONTENT
+   ============================================================ */
+      .main {
+        margin-left: var(--sidebar-w);
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        min-width: 0;
+      }
+      .main.sidebar-collapsed-main {
+        margin-left: var(--sidebar-collapsed);
+      }
+
+      /* ============================================================
+   TOPBAR
+   ============================================================ */
+      .topbar {
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+        height: var(--topbar-h);
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 0 28px;
+        position: sticky;
+        top: 0;
+        z-index: 99;
+        transition:
+          background 0.35s,
+          border 0.35s;
+      }
+      .topbar-left {
+        display: flex;
+        flex-direction: column;
+      }
+      .topbar-title {
+        font-size: 1.05rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+      .topbar-title span {
+        color: var(--primary);
+      }
+      .topbar-sub {
+        font-size: 0.7rem;
+        color: var(--muted);
+        font-weight: 500;
+      }
+
+      .ward-tabs {
+        display: flex;
+        gap: 6px;
+        flex: 1;
+        justify-content: center;
+      }
+      .ward-tab {
+        padding: 7px 16px;
+        border-radius: 999px;
+        border: 1.5px solid var(--border);
+        background: transparent;
+        font-size: 0.76rem;
+        font-weight: 600;
+        color: var(--muted);
+        cursor: pointer;
+        transition: var(--transition);
+        white-space: nowrap;
+      }
+      .ward-tab.active {
+        background: var(--primary);
+        border-color: var(--primary);
+        color: #fff;
+      }
+      .ward-tab:hover:not(.active) {
+        border-color: var(--primary);
+        color: var(--primary);
+      }
+
+      .topbar-right {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .topbar-clock {
+        font-family: var(--mono);
+        font-size: 0.76rem;
+        font-weight: 600;
+        background: var(--primary-light);
+        color: var(--primary);
+        padding: 5px 12px;
+        border-radius: 8px;
+        white-space: nowrap;
+      }
+      .topbar-btn {
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        border: 1.5px solid var(--border);
+        background: transparent;
+        color: var(--muted);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: var(--transition);
+        position: relative;
+      }
+      .topbar-btn:hover {
+        border-color: var(--primary);
+        color: var(--primary);
+        background: var(--primary-light);
+      }
+      .notif-dot {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        width: 7px;
+        height: 7px;
+        background: var(--crit);
+        border-radius: 50%;
+        border: 1.5px solid var(--surface);
+      }
+      .search-wrap {
+        position: relative;
+      }
+      .search-input {
+        background: var(--surface2);
+        border: 1.5px solid var(--border);
+        border-radius: 10px;
+        padding: 8px 12px 8px 36px;
+        font-family: var(--font);
+        font-size: 0.8rem;
+        color: var(--text);
+        width: 190px;
+        transition: var(--transition);
+      }
+      .search-input:focus {
+        outline: none;
+        border-color: var(--primary);
+        background: var(--surface);
+        width: 220px;
+      }
+      .search-input::placeholder {
+        color: var(--muted2);
+      }
+      .search-icon {
+        position: absolute;
+        left: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--muted2);
+        pointer-events: none;
+      }
+
+      /* ============================================================
+   PAGE CONTENT
+   ============================================================ */
+      .content {
+        padding: 22px 28px;
+        flex: 1;
+      }
+
+      /* ============================================================
+   SUMMARY STATS
+   ============================================================ */
+      .summary-row {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 14px;
+        margin-bottom: 20px;
+      }
+      .stat-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        padding: 18px 20px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        box-shadow: var(--shadow-xs);
+        transition: var(--transition);
+        cursor: default;
+      }
+      .stat-card:hover {
+        box-shadow: var(--shadow-md);
+        transform: translateY(-1px);
+      }
+      .stat-ico {
+        width: 50px;
+        height: 50px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+      .ico-blue {
+        background: var(--primary-light);
+        color: var(--primary);
+      }
+      .ico-green {
+        background: var(--ok-bg);
+        color: var(--ok);
+      }
+      .ico-amber {
+        background: var(--warn-bg);
+        color: var(--warn);
+      }
+      .ico-red {
+        background: var(--crit-bg);
+        color: var(--crit);
+      }
+      .stat-body p {
+        font-size: 0.71rem;
+        color: var(--muted);
+        font-weight: 600;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        margin-bottom: 2px;
+      }
+      .stat-body h2 {
+        font-size: 2rem;
+        font-weight: 700;
+        letter-spacing: -0.05em;
+        line-height: 1;
+      }
+      .stat-body small {
+        font-size: 0.7rem;
+        color: var(--muted);
+      }
+      .trend-up {
+        color: var(--ok);
+        font-size: 0.7rem;
+        font-weight: 700;
+      }
+      .trend-dn {
+        color: var(--crit);
+        font-size: 0.7rem;
+        font-weight: 700;
+      }
+
+      /* ============================================================
+   TOOLBAR / CONTROLS
+   ============================================================ */
+      .toolbar {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        padding: 12px 18px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 20px;
+        box-shadow: var(--shadow-xs);
+        flex-wrap: wrap;
+      }
+      .toolbar-label {
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: var(--muted);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        margin-right: 4px;
+      }
+      .ctrl-btn {
+        padding: 7px 15px;
+        border-radius: 9px;
+        border: 1.5px solid;
+        font-size: 0.76rem;
+        font-weight: 700;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: var(--transition);
+      }
+      .ctrl-ok {
+        color: var(--ok);
+        border-color: var(--ok-border);
+        background: var(--ok-bg);
+      }
+      .ctrl-ok:hover {
+        filter: brightness(0.93);
+      }
+      .ctrl-warn {
+        color: var(--warn);
+        border-color: var(--warn-border);
+        background: var(--warn-bg);
+      }
+      .ctrl-warn:hover {
+        filter: brightness(0.93);
+      }
+      .ctrl-crit {
+        color: var(--crit);
+        border-color: var(--crit-border);
+        background: var(--crit-bg);
+      }
+      .ctrl-crit:hover {
+        filter: brightness(0.93);
+      }
+      .ctrl-sep {
+        width: 1px;
+        height: 24px;
+        background: var(--border);
+        margin: 0 4px;
+        flex-shrink: 0;
+      }
+      .sound-toggle {
+        margin-left: auto;
+        padding: 7px 15px;
+        border-radius: 9px;
+        border: 1.5px solid var(--border);
+        background: transparent;
+        font-size: 0.76rem;
+        font-weight: 700;
+        color: var(--muted);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: var(--transition);
+      }
+      .sound-toggle.active {
+        color: var(--crit);
+        border-color: var(--crit-border);
+        background: var(--crit-bg);
+      }
+      .dark-toggle-btn {
+        padding: 7px 15px;
+        border-radius: 9px;
+        border: 1.5px solid var(--border);
+        background: transparent;
+        font-size: 0.76rem;
+        font-weight: 700;
+        color: var(--muted);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: var(--transition);
+      }
+      .dark-toggle-btn:hover {
+        border-color: var(--primary);
+        color: var(--primary);
+      }
+      .focus-btn {
+        padding: 7px 15px;
+        border-radius: 9px;
+        border: 1.5px solid var(--border);
+        background: transparent;
+        font-size: 0.76rem;
+        font-weight: 700;
+        color: var(--muted);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: var(--transition);
+      }
+      .focus-btn.active {
+        color: var(--warn);
+        border-color: var(--warn-border);
+        background: var(--warn-bg);
+      }
+
+      /* ============================================================
+   MAIN GRID LAYOUT
+   ============================================================ */
+      .grid-layout {
+        display: grid;
+        grid-template-columns: 1fr 360px;
+        gap: 20px;
+        align-items: start;
+      }
+      .patients-section {
+      }
+      .section-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 14px;
+      }
+      .section-head h3 {
+        font-size: 0.9rem;
+        font-weight: 700;
+      }
+      .section-head span {
+        font-size: 0.72rem;
+        color: var(--muted);
+      }
+      .filter-row {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-bottom: 14px;
+      }
+      .filter-chip {
+        padding: 5px 12px;
+        border-radius: 999px;
+        border: 1.5px solid var(--border);
+        background: var(--surface2);
+        font-size: 0.72rem;
+        font-weight: 600;
+        color: var(--muted);
+        cursor: pointer;
+        transition: var(--transition);
+      }
+      .filter-chip.active {
+        background: var(--primary);
+        border-color: var(--primary);
+        color: #fff;
+      }
+      .filter-chip:hover:not(.active) {
+        border-color: var(--primary);
+        color: var(--primary);
+      }
+
+      /* ============================================================
+   PATIENT CARDS
+   ============================================================ */
+      .patients-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+        gap: 14px;
+      }
+      .patient-card {
+        background: var(--surface);
+        border: 1.5px solid var(--border);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        box-shadow: var(--shadow-xs);
+        transition:
+          box-shadow 0.35s,
+          transform 0.3s,
+          border-color 0.3s;
+        cursor: pointer;
+        position: relative;
+      }
+      .patient-card:hover {
+        box-shadow: var(--shadow-md);
+        transform: translateY(-2px);
+      }
+      .patient-card.s-normal {
+        border-top: 3px solid var(--ok);
+      }
+      .patient-card.s-warning {
+        border-top: 3px solid var(--warn);
+      }
+      .patient-card.s-critical {
+        border-top: 3px solid var(--crit);
+        animation: cardPulse 2s infinite;
+      }
+      .patient-card.s-offline {
+        border-top: 3px solid var(--offline);
+        opacity: 0.75;
+      }
+      @keyframes cardPulse {
+        0%,
+        100% {
+          box-shadow: var(--shadow-xs);
+        }
+        50% {
+          box-shadow:
+            0 0 0 4px rgba(201, 32, 42, 0.15),
+            var(--shadow-md);
+        }
+      }
+
+      /* Card header */
+      .card-hd {
+        padding: 15px 16px 11px;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+      }
+      .card-pat {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+      }
+      .pat-av {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.82rem;
+        color: #fff;
+        flex-shrink: 0;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+      }
+      .av1 {
+        background: linear-gradient(135deg, #1a56db, #60a5fa);
+      }
+      .av2 {
+        background: linear-gradient(135deg, #7c3aed, #c084fc);
+      }
+      .av3 {
+        background: linear-gradient(135deg, #0d9f5a, #34d399);
+      }
+      .av4 {
+        background: linear-gradient(135deg, #db2777, #f9a8d4);
+      }
+      .av5 {
+        background: linear-gradient(135deg, #d97706, #fbbf24);
+      }
+      .pat-name {
+        font-weight: 700;
+        font-size: 0.88rem;
+        line-height: 1.25;
+      }
+      .pat-meta {
+        font-size: 0.67rem;
+        color: var(--muted);
+        font-family: var(--mono);
+        margin-top: 2px;
+      }
+
+      /* Status + live badges */
+      .card-badges {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 5px;
+      }
+      .status-pill {
+        padding: 3px 10px;
+        border-radius: 999px;
+        font-size: 0.66rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        border: 1px solid;
+      }
+      .p-normal {
+        background: var(--ok-bg);
+        color: var(--ok);
+        border-color: var(--ok-border);
+      }
+      .p-warning {
+        background: var(--warn-bg);
+        color: var(--warn);
+        border-color: var(--warn-border);
+      }
+      .p-critical {
+        background: var(--crit-bg);
+        color: var(--crit);
+        border-color: var(--crit-border);
+      }
+      .p-offline {
+        background: var(--offline-bg);
+        color: var(--offline);
+        border-color: var(--offline-border);
+      }
+
+      .live-badge {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.62rem;
+        font-weight: 600;
+        color: var(--muted);
+      }
+      .live-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--ok);
+      }
+      .live-dot.offline {
+        background: var(--offline);
+      }
+      .live-dot.live {
+        animation: livePulse 1.5s infinite;
+      }
+      @keyframes livePulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.3;
+        }
+      }
+
+      /* Fluid bar */
+      .fluid-sec {
+        padding: 0 16px 12px;
+      }
+      .fluid-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 6px;
+      }
+      .fluid-lbl {
+        font-size: 0.72rem;
+        color: var(--muted);
+        font-weight: 600;
+      }
+      .fluid-val {
+        font-family: var(--mono);
+        font-size: 0.82rem;
+        font-weight: 600;
+      }
+      .fluid-track {
+        height: 8px;
+        background: var(--surface3);
+        border-radius: 999px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+      }
+      .fluid-fill {
+        height: 100%;
+        border-radius: 999px;
+        transition:
+          width 1s cubic-bezier(0.4, 0, 0.2, 1),
+          background 0.6s;
+      }
+
+      /* Metrics grid */
+      .card-metrics {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        padding: 0 16px 12px;
+      }
+      .metric-cell {
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 9px 6px;
+        text-align: center;
+        transition: var(--transition);
+      }
+      .metric-cell:hover {
+        background: var(--surface3);
+      }
+      .metric-val {
+        font-family: var(--mono);
+        font-size: 0.96rem;
+        font-weight: 700;
+        line-height: 1;
+      }
+      .metric-lbl {
+        font-size: 0.6rem;
+        color: var(--muted);
+        margin-top: 3px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+
+      /* Card footer */
+      .card-ft {
+        padding: 10px 16px;
+        border-top: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .clamp-status {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.74rem;
+        font-weight: 600;
+      }
+      .clamp-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+      }
+      .last-update {
+        font-size: 0.62rem;
+        color: var(--muted2);
+        font-family: var(--mono);
+      }
+      .sim-btns {
+        display: flex;
+        gap: 5px;
+      }
+      .sim-btn {
+        padding: 4px 9px;
+        border-radius: 7px;
+        border: 1.5px solid var(--border);
+        font-size: 0.65rem;
+        font-weight: 700;
+        cursor: pointer;
+        background: transparent;
+        transition: var(--transition);
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .sb-ok {
+        color: var(--ok);
+        border-color: var(--ok-border);
+      }
+      .sb-ok:hover {
+        background: var(--ok-bg);
+      }
+      .sb-warn {
+        color: var(--warn);
+        border-color: var(--warn-border);
+      }
+      .sb-warn:hover {
+        background: var(--warn-bg);
+      }
+      .sb-crit {
+        color: var(--crit);
+        border-color: var(--crit-border);
+      }
+      .sb-crit:hover {
+        background: var(--crit-bg);
+      }
+      .sb-disc {
+        color: var(--offline);
+        border-color: var(--offline-border);
+      }
+      .sb-disc:hover {
+        background: var(--offline-bg);
+      }
+
+      /* Skeleton loader */
+      .skeleton {
+        background: var(--surface3);
+        border-radius: 6px;
+        animation: shimmer 1.5s infinite;
+      }
+      @keyframes shimmer {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.45;
+        }
+      }
+
+      /* ============================================================
+   RIGHT PANEL
+   ============================================================ */
+      .right-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .panel {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        padding: 16px;
+        box-shadow: var(--shadow-xs);
+        transition:
+          background 0.35s,
+          border 0.35s;
+      }
+      .panel-hd {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 14px;
+      }
+      .panel-title {
+        font-size: 0.85rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .crit-badge {
+        background: var(--crit-bg);
+        color: var(--crit);
+        border: 1px solid var(--crit-border);
+        border-radius: 999px;
+        padding: 1px 8px;
+        font-size: 0.65rem;
+        font-weight: 700;
+      }
+
+      /* Alert List */
+      .alert-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        max-height: 290px;
+        overflow-y: auto;
+        padding-right: 2px;
+      }
+      .alert-item {
+        display: flex;
+        gap: 9px;
+        padding: 9px 11px;
+        border-radius: 10px;
+        border: 1px solid transparent;
+        animation: slideIn 0.28s ease;
+        position: relative;
+        overflow: hidden;
+      }
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateX(10px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      .ai-normal {
+        background: var(--ok-bg);
+        border-color: var(--ok-border);
+      }
+      .ai-warning {
+        background: var(--warn-bg);
+        border-color: var(--warn-border);
+      }
+      .ai-critical {
+        background: var(--crit-bg);
+        border-color: var(--crit-border);
+      }
+      .ai-critical::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 3px;
+        background: var(--crit);
+        animation: critStrobe 1s infinite;
+      }
+      @keyframes critStrobe {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.3;
+        }
+      }
+      .alert-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        margin-top: 5px;
+        flex-shrink: 0;
+      }
+      .ai-normal .alert-dot {
+        background: var(--ok);
+      }
+      .ai-warning .alert-dot {
+        background: var(--warn);
+      }
+      .ai-critical .alert-dot {
+        background: var(--crit);
+      }
+      .alert-body {
+        flex: 1;
+      }
+      .alert-msg {
+        font-size: 0.75rem;
+        font-weight: 600;
+        line-height: 1.4;
+      }
+      .alert-time {
+        font-size: 0.63rem;
+        color: var(--muted);
+        font-family: var(--mono);
+        margin-top: 2px;
+      }
+      .alert-ack {
+        flex-shrink: 0;
+        padding: 3px 8px;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: transparent;
+        font-size: 0.62rem;
+        font-weight: 700;
+        color: var(--muted);
+        cursor: pointer;
+        align-self: center;
+        transition: var(--transition);
+      }
+      .alert-ack:hover {
+        background: var(--surface);
+        color: var(--primary);
+        border-color: var(--primary);
+      }
+      .no-alerts {
+        text-align: center;
+        padding: 24px 0;
+        color: var(--muted);
+        font-size: 0.78rem;
+      }
+      .no-alerts svg {
+        display: block;
+        margin: 0 auto 8px;
+        opacity: 0.4;
+      }
+
+      /* Chart panel */
+      .chart-container {
+        position: relative;
+        height: 140px;
+      }
+
+      /* Gateway panel */
+      .gw-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .gw-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 11px;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 11px;
+        transition: var(--transition);
+      }
+      .gw-item:hover {
+        background: var(--surface3);
+      }
+      .gw-ico {
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, #1a56db, #60a5fa);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        flex-shrink: 0;
+      }
+      .gw-info {
+        flex: 1;
+      }
+      .gw-name {
+        font-size: 0.78rem;
+        font-weight: 700;
+      }
+      .gw-sub {
+        font-size: 0.64rem;
+        color: var(--muted);
+        margin-top: 1px;
+      }
+      .signal-bars {
+        display: flex;
+        gap: 2px;
+        align-items: flex-end;
+        height: 14px;
+      }
+      .sig-bar {
+        width: 3px;
+        border-radius: 2px;
+        background: var(--border);
+      }
+      .sig-bar.lit {
+        background: var(--ok);
+      }
+      .conn-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+      }
+      .conn-ok {
+        background: var(--ok);
+        animation: livePulse 2s infinite;
+      }
+      .conn-off {
+        background: var(--offline);
+      }
+      .conn-warn {
+        background: var(--warn);
+      }
+      .conn-error {
+        background: var(--crit);
+        animation: livePulse 1s infinite;
+      }
+
+      /* ============================================================
+   MODAL — Patient Detail
+   ============================================================ */
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(8, 13, 24, 0.7);
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s;
+        backdrop-filter: blur(4px);
+      }
+      .modal-overlay.open {
+        opacity: 1;
+        pointer-events: all;
+      }
+      .modal {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        width: 100%;
+        max-width: 620px;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: var(--shadow-lg);
+        transform: translateY(20px) scale(0.97);
+        transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+      }
+      .modal-overlay.open .modal {
+        transform: translateY(0) scale(1);
+      }
+      .modal-hd {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 20px 22px;
+        border-bottom: 1px solid var(--border);
+        position: sticky;
+        top: 0;
+        background: var(--surface);
+        z-index: 10;
+      }
+      .modal-close {
+        margin-left: auto;
+        width: 34px;
+        height: 34px;
+        border-radius: 9px;
+        border: 1.5px solid var(--border);
+        background: transparent;
+        color: var(--muted);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: var(--transition);
+      }
+      .modal-close:hover {
+        background: var(--crit-bg);
+        color: var(--crit);
+        border-color: var(--crit-border);
+      }
+      .modal-body {
+        padding: 20px 22px;
+      }
+      .modal-section {
+        margin-bottom: 20px;
+      }
+      .modal-section-title {
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+        margin-bottom: 12px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--border);
+      }
+      .modal-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+      }
+      .modal-cell {
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 12px;
+        text-align: center;
+      }
+      .modal-cell-val {
+        font-family: var(--mono);
+        font-size: 1.15rem;
+        font-weight: 700;
+      }
+      .modal-cell-lbl {
+        font-size: 0.62rem;
+        color: var(--muted);
+        font-weight: 600;
+        text-transform: uppercase;
+        margin-top: 3px;
+      }
+      .modal-chart {
+        height: 160px;
+        position: relative;
+        margin-top: 10px;
+      }
+      .modal-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 4px;
+      }
+      .modal-btn {
+        flex: 1;
+        padding: 9px;
+        border-radius: 10px;
+        border: 1.5px solid;
+        font-size: 0.78rem;
+        font-weight: 700;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        transition: var(--transition);
+      }
+      .modal-btn-primary {
+        background: var(--primary);
+        color: #fff;
+        border-color: var(--primary);
+      }
+      .modal-btn-primary:hover {
+        background: var(--primary-hover);
+      }
+      .modal-btn-ok {
+        color: var(--ok);
+        border-color: var(--ok-border);
+        background: var(--ok-bg);
+      }
+      .modal-btn-ok:hover {
+        filter: brightness(0.9);
+      }
+      .modal-btn-reset {
+        color: var(--primary);
+        border-color: var(--primary-dim);
+        background: var(--primary-light);
+      }
+      .modal-btn-reset:hover {
+        filter: brightness(0.9);
+      }
+
+      /* ============================================================
+   FOCUS MODE
+   ============================================================ */
+      body.focus-mode .patient-card:not(.s-critical) {
+        opacity: 0.3;
+        filter: grayscale(0.5);
+        pointer-events: none;
+      }
+      body.focus-mode .patient-card.s-critical {
+        opacity: 1;
+        filter: none;
+        pointer-events: all;
+      }
+
+      /* ============================================================
+   CONNECTION STATUS BAR
+   ============================================================ */
+      .conn-bar {
+        background: var(--ok-bg);
+        border-bottom: 1px solid var(--ok-border);
+        padding: 5px 28px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        color: var(--ok);
+        transition: var(--transition);
+      }
+      .conn-bar.offline {
+        background: var(--crit-bg);
+        border-color: var(--crit-border);
+        color: var(--crit);
+      }
+      .conn-bar-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: currentColor;
+        animation: livePulse 1.5s infinite;
+      }
+
+      /* ============================================================
+   LOADING / SKELETON STATES
+   ============================================================ */
+      .loading-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+        gap: 14px;
+      }
+      .skeleton-card {
+        background: var(--surface);
+        border: 1.5px solid var(--border);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        height: 220px;
+        padding: 16px;
+      }
+      .skel-line {
+        height: 10px;
+        border-radius: 5px;
+        margin-bottom: 10px;
+      }
+      .skel-circle {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+      }
+
+      /* ============================================================
+   RESPONSIVE
+   ============================================================ */
+      @media (max-width: 1200px) {
+        .grid-layout {
+          grid-template-columns: 1fr;
+        }
+        .right-panel {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+      @media (max-width: 900px) {
+        :root {
+          --sidebar-w: 72px;
+        }
+        .sidebar .logo-text,
+        .sidebar .nav-text,
+        .sidebar .nav-badge,
+        .sidebar .nav-label,
+        .sidebar .user-info {
+          opacity: 0;
+        }
+        .topbar {
+          padding: 0 16px;
+        }
+        .ward-tabs {
+          display: none;
+        }
+        .content {
+          padding: 14px;
+        }
+        .summary-row {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+      @media (max-width: 640px) {
+        .summary-row {
+          grid-template-columns: 1fr;
+        }
+        .right-panel {
+          grid-template-columns: 1fr;
+        }
+        .patients-grid {
+          grid-template-columns: 1fr;
+        }
+        .main {
+          margin-left: 0;
+        }
+        .sidebar {
+          display: none;
+        }
+        .search-wrap {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ============================================================
+     APP SHELL
+     ============================================================ -->
+    <div class="app" id="app">
+      <!-- ============================================================
+       SIDEBAR
+       ============================================================ -->
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-inner">
+          <!-- Logo -->
+          <a class="sidebar-logo" href="#">
+            <div class="logo-icon">
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+              </svg>
+            </div>
+            <div class="logo-text">
+              <strong>MedFlow ICU</strong>
+              <span>IV Monitoring System</span>
+            </div>
+          </a>
+
+          <!-- Toggle button -->
+          <button
+            class="sidebar-toggle"
+            id="sidebarToggle"
+            title="Toggle sidebar"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+            >
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+          </button>
+
+          <!-- Main navigation -->
+          <div class="nav-section">
+            <div class="nav-label">Monitoring</div>
+            <button
+              class="nav-item active"
+              data-tip="Dashboard"
+              onclick="setPage(this, 'dashboard')"
+            >
+              <span class="nav-icon">
+                <svg
+                  width="17"
+                  height="17"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                  <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                  <rect x="3" y="14" width="7" height="7" rx="1.5" />
+                  <rect x="14" y="14" width="7" height="7" rx="1.5" />
+                </svg>
+              </span>
+              <span class="nav-text">Dashboard</span>
+            </button>
+            <button
+              class="nav-item"
+              data-tip="Patients"
+              onclick="setPage(this, 'patients')"
+            >
+              <span class="nav-icon">
+                <svg
+                  width="17"
+                  height="17"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+              </span>
+              <span class="nav-text">Patients</span>
+            </button>
+            <button
+              class="nav-item"
+              data-tip="Live Alerts"
+              onclick="setPage(this, 'alerts')"
+            >
+              <span class="nav-icon">
+                <svg
+                  width="17"
+                  height="17"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                </svg>
+              </span>
+              <span class="nav-text">Live Alerts</span>
+              <span class="nav-badge" id="sidebarBadge">0</span>
+            </button>
+            <!-- <button class="nav-item" data-tip="Vitals & Charts" onclick="setPage(this,'vitals')">
+          <span class="nav-icon">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          </span>
+          <span class="nav-text">Vitals</span>
+        </button> -->
+          </div>
+
+          <!-- <div class="nav-section">
+        <div class="nav-label">System</div>
+        <button class="nav-item" data-tip="Reports" onclick="setPage(this,'reports')">
+          <span class="nav-icon">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          </span>
+          <span class="nav-text">Reports</span>
+        </button>
+        <button class="nav-item" data-tip="Settings" onclick="setPage(this,'settings')">
+          <span class="nav-icon">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </span>
+          <span class="nav-text">Settings</span>
+        </button>
+      </div> -->
+
+          <!-- User info at bottom -->
+          <div class="sidebar-footer">
+            <div class="user-card">
+              <div class="user-av">DR</div>
+              <div class="user-info">
+                <strong>Dr. Sharma</strong>
+                <span>Senior ICU Nurse</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- ============================================================
+       MAIN
+       ============================================================ -->
+      <div class="main" id="mainContent">
+        <!-- Connection status bar -->
+        <div class="conn-bar" id="connBar">
+          <div class="conn-bar-dot"></div>
+          <span
+            style="
+              margin-left: auto;
+              font-family: var(--mono);
+              font-size: 0.68rem;
+              opacity: 0.8;
+            "
+            id="connTime"
+          ></span>
+        </div>
+
+        <!-- Topbar -->
+        <header class="topbar">
+          <div class="topbar-left">
+            <div class="topbar-title">IV <span>Drip Monitor</span></div>
+            <div class="topbar-sub">Ward A — ICU Bay 1–5</div>
+          </div>
+
+          <div class="ward-tabs">
+            <button class="ward-tab active">Ward A</button>
+            <button class="ward-tab">Ward B</button>
+            <button class="ward-tab">ICU</button>
+            <button class="ward-tab">Recovery</button>
+            <button class="ward-tab">General</button>
+          </div>
+
+          <div class="topbar-right">
+            <div class="search-wrap">
+              <svg
+                class="search-icon"
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.35-4.35" />
+              </svg>
+              <input
+                type="text"
+                class="search-input"
+                id="searchInput"
+                placeholder="Search patient..."
+              />
+            </div>
+            <span class="topbar-clock" id="topClock">--:--:--</span>
+            <button class="topbar-btn" id="notifBtn" title="Notifications">
+              <div class="notif-dot" id="notifDot"></div>
+              <svg
+                width="17"
+                height="17"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+              </svg>
+            </button>
+            <button class="topbar-btn" id="darkToggle" title="Toggle dark mode">
+              <svg
+                id="darkIcon"
+                width="17"
+                height="17"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+              </svg>
+            </button>
+          </div>
+        </header>
+
+        <!-- Content area -->
+        <div class="content">
+          <!-- Summary Stats -->
+          <div class="summary-row">
+            <div class="stat-card">
+              <div class="stat-ico ico-blue">
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                  <polyline points="9 22 9 12 15 12 15 22" />
+                </svg>
+              </div>
+              <div class="stat-body">
+                <p>Total Patients</p>
+                <h2>5</h2>
+                <small>Ward A active</small>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-ico ico-green">
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                  <polyline points="22 4 12 14.01 9 11.01" />
+                </svg>
+              </div>
+              <div class="stat-body">
+                <p>Normal</p>
+                <h2 id="cntN">—</h2>
+                <small id="pctN">—</small>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-ico ico-amber">
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path
+                    d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+                  />
+                  <line x1="12" y1="9" x2="12" y2="13" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+              </div>
+              <div class="stat-body">
+                <p>Warning</p>
+                <h2 id="cntW">—</h2>
+                <small id="pctW">—</small>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-ico ico-red">
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+              </div>
+              <div class="stat-body">
+                <p>Critical</p>
+                <h2 id="cntC">—</h2>
+                <small id="pctC">—</small>
+              </div>
+            </div>
+          </div>
+
+          <!-- Toolbar — Controls only, simulation removed -->
+          <div class="toolbar">
+            <button class="focus-btn" id="focusBtn">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+              Focus: Critical
+            </button>
+            <button class="sound-toggle" id="soundBtn">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+              </svg>
+              Sound OFF
+            </button>
+            <button class="dark-toggle-btn" id="darkBtn">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+              </svg>
+              Night Mode
+            </button>
+            <span
+              style="
+                margin-left: auto;
+                font-size: 0.72rem;
+                color: var(--muted);
+                font-weight: 500;
+              "
+            >
+              <span
+                id="espStatus"
+                style="display: inline-flex; align-items: center; gap: 5px"
+              >
+                <span
+                  style="
+                    width: 7px;
+                    height: 7px;
+                    border-radius: 50%;
+                    background: var(--ok);
+                    display: inline-block;
+                  "
+                ></span>
+                ESP32 Ready — Awaiting live data
+              </span>
+            </span>
+          </div>
+
+          <!-- Grid layout -->
+          <div class="grid-layout">
+            <!-- Patient Grid -->
+            <div class="patients-section">
+              <div class="section-head">
+                <h3>Patient Monitoring — Ward A</h3>
+                <span id="gridCount">5 patients</span>
+              </div>
+              <div class="filter-row">
+                <button
+                  class="filter-chip active"
+                  onclick="filterCards(this, 'all')"
+                >
+                  All
+                </button>
+                <button
+                  class="filter-chip"
+                  onclick="filterCards(this, 'normal')"
+                >
+                  <svg
+                    width="10"
+                    height="10"
+                    style="margin-right: 3px"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                  >
+                    <polyline points="20 6 9 17 4 12" /></svg
+                  >Normal
+                </button>
+                <button
+                  class="filter-chip"
+                  onclick="filterCards(this, 'warning')"
+                >
+                  <svg
+                    width="10"
+                    height="10"
+                    style="margin-right: 3px"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                  >
+                    <line x1="12" y1="9" x2="12" y2="13" /></svg
+                  >Warning
+                </button>
+                <button
+                  class="filter-chip"
+                  onclick="filterCards(this, 'critical')"
+                >
+                  <svg
+                    width="10"
+                    height="10"
+                    style="margin-right: 3px"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                  >
+                    <circle cx="12" cy="12" r="9" /></svg
+                  >Critical
+                </button>
+                <button
+                  class="filter-chip"
+                  onclick="filterCards(this, 'offline')"
+                >
+                  Offline
+                </button>
+              </div>
+              <div class="patients-grid" id="grid">
+                <!-- Skeleton loaders shown initially -->
+                <div class="skeleton-card">
+                  <div class="skel-line skeleton" style="width: 60%"></div>
+                  <div class="skel-line skeleton" style="width: 40%"></div>
+                  <div
+                    class="skel-line skeleton"
+                    style="width: 80%; height: 8px; margin-top: 16px"
+                  ></div>
+                </div>
+                <div class="skeleton-card">
+                  <div class="skel-line skeleton" style="width: 60%"></div>
+                  <div class="skel-line skeleton" style="width: 40%"></div>
+                  <div
+                    class="skel-line skeleton"
+                    style="width: 80%; height: 8px; margin-top: 16px"
+                  ></div>
+                </div>
+                <div class="skeleton-card">
+                  <div class="skel-line skeleton" style="width: 60%"></div>
+                  <div class="skel-line skeleton" style="width: 40%"></div>
+                  <div
+                    class="skel-line skeleton"
+                    style="width: 80%; height: 8px; margin-top: 16px"
+                  ></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Panel -->
+            <div class="right-panel">
+              <!-- Live Alerts -->
+              <div class="panel">
+                <div class="panel-hd">
+                  <div class="panel-title">
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                    </svg>
+                    Live Alerts
+                    <span class="crit-badge" id="alertBadge">0</span>
+                  </div>
+                  <button
+                    style="
+                      font-size: 0.7rem;
+                      color: var(--primary);
+                      font-weight: 700;
+                      border: none;
+                      background: none;
+                      cursor: pointer;
+                    "
+                    id="clearAckBtn"
+                  >
+                    Clear Ack'd
+                  </button>
+                </div>
+                <div class="alert-list" id="alertList">
+                  <div class="no-alerts">
+                    <svg
+                      width="32"
+                      height="32"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                    >
+                      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                    </svg>
+                    No active alerts
+                  </div>
+                </div>
+              </div>
+
+              <!-- Drip Rate Chart -->
+              <div class="panel">
+                <div class="panel-hd">
+                  <div class="panel-title">
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                    </svg>
+                    Drip Rate Trend
+                  </div>
+                  <span
+                    style="
+                      font-size: 0.68rem;
+                      color: var(--muted);
+                      font-family: var(--mono);
+                    "
+                    >drops/min</span
+                  >
+                </div>
+                <div class="chart-container">
+                  <canvas id="dripChart"></canvas>
+                </div>
+              </div>
+
+              <!-- Fluid Level Chart -->
+              <div class="panel">
+                <div class="panel-hd">
+                  <div class="panel-title">
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
+                    </svg>
+                    Fluid Levels
+                  </div>
+                  <span
+                    style="
+                      font-size: 0.68rem;
+                      color: var(--muted);
+                      font-family: var(--mono);
+                    "
+                    >% remaining</span
+                  >
+                </div>
+                <div class="chart-container">
+                  <canvas id="fluidChart"></canvas>
+                </div>
+              </div>
+
+              <!-- IoT Gateway -->
+              <div class="panel">
+                <div class="panel-hd">
+                  <div class="panel-title">
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <path d="M1.42 9a16 16 0 0 1 21.16 0" />
+                      <path d="M5 12.55a11 11 0 0 1 14.08 0" />
+                      <path d="M10.54 16.1a6 6 0 0 1 2.92 0" />
+                      <line x1="12" y1="20" x2="12.01" y2="20" />
+                    </svg>
+                    IoT Gateway
+                  </div>
+                  <span
+                    style="
+                      font-size: 0.68rem;
+                      color: var(--ok);
+                      font-weight: 700;
+                      display: flex;
+                      align-items: center;
+                      gap: 4px;
+                    "
+                  >
+                    <div
+                      style="
+                        width: 6px;
+                        height: 6px;
+                        border-radius: 50%;
+                        background: var(--ok);
+                      "
+                    ></div>
+                    Online
+                  </span>
+                </div>
+                <div class="gw-list">
+                  <div class="gw-item">
+                    <div class="gw-ico">
+                      <svg
+                        width="17"
+                        height="17"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                      >
+                        <rect x="4" y="4" width="16" height="16" rx="2" />
+                        <rect x="9" y="9" width="6" height="6" />
+                        <line x1="9" y1="1" x2="9" y2="4" />
+                        <line x1="15" y1="1" x2="15" y2="4" />
+                        <line x1="9" y1="20" x2="9" y2="23" />
+                        <line x1="15" y1="20" x2="15" y2="23" />
+                      </svg>
+                    </div>
+                    <div class="gw-info">
+                      <div class="gw-name">Smart Hub — ESP32</div>
+                      <div class="gw-sub">5 devices · syncing</div>
+                    </div>
+                    <div class="signal-bars">
+                      <div class="sig-bar lit" style="height: 4px"></div>
+                      <div class="sig-bar lit" style="height: 7px"></div>
+                      <div class="sig-bar lit" style="height: 10px"></div>
+                      <div class="sig-bar lit" style="height: 13px"></div>
+                    </div>
+                  </div>
+                  <div class="gw-item">
+                    <div
+                      class="gw-ico"
+                      style="
+                        background: linear-gradient(135deg, #0d9f5a, #34d399);
+                      "
+                    >
+                      <svg
+                        width="17"
+                        height="17"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                      >
+                        <path d="M1.42 9a16 16 0 0 1 21.16 0" />
+                        <path d="M5 12.55a11 11 0 0 1 14.08 0" />
+                        <line x1="12" y1="20" x2="12.01" y2="20" />
+                      </svg>
+                    </div>
+                    <div class="gw-info">
+                      <div class="gw-name">Wi-Fi Relay Node</div>
+                      <div class="gw-sub">2.4GHz · 5 sensors</div>
+                    </div>
+                    <div class="signal-bars">
+                      <div class="sig-bar lit" style="height: 4px"></div>
+                      <div class="sig-bar lit" style="height: 7px"></div>
+                      <div class="sig-bar lit" style="height: 10px"></div>
+                      <div class="sig-bar" style="height: 13px"></div>
+                    </div>
+                  </div>
+                  <div class="gw-item">
+                    <div
+                      class="gw-ico"
+                      style="
+                        background: linear-gradient(135deg, #7c3aed, #c084fc);
+                      "
+                    >
+                      <svg
+                        width="17"
+                        height="17"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                      >
+                        <rect x="2" y="3" width="20" height="14" rx="2" />
+                        <line x1="8" y1="21" x2="16" y2="21" />
+                        <line x1="12" y1="17" x2="12" y2="21" />
+                      </svg>
+                    </div>
+                    <div class="gw-info">
+                      <div class="gw-name">Cloud Dashboard</div>
+                      <div class="gw-sub">
+                        Last sync:
+                        <span id="gwSyncTime">--:--</span> &nbsp;·&nbsp;
+                        <span id="connStatusText">Connecting…</span>
+                      </div>
+                    </div>
+                    <div class="conn-dot conn-warn" id="connDot"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- /main -->
+    </div>
+    <!-- /app -->
+
+    <!-- ============================================================
+     PATIENT DETAIL MODAL
+     ============================================================ -->
+    <div class="modal-overlay" id="modalOverlay">
+      <div class="modal" id="modal">
+        <div class="modal-hd" id="modalHd">
+          <div
+            class="pat-av"
+            id="modalAv"
+            style="width: 46px; height: 46px; font-size: 0.9rem"
+          ></div>
+          <div>
+            <div style="font-size: 1rem; font-weight: 700" id="modalName">
+              Patient Name
+            </div>
+            <div
+              style="
+                font-size: 0.7rem;
+                color: var(--muted);
+                font-family: var(--mono);
+              "
+              id="modalMeta"
+            >
+              ID · Bed
+            </div>
+          </div>
+          <button class="modal-close" id="modalCloseBtn">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="modal-section">
+            <div class="modal-section-title">Current Metrics</div>
+            <div class="modal-grid" id="modalMetrics"></div>
+          </div>
+          <div class="modal-section">
+            <div class="modal-section-title">
+              IV Fluid History (last 10 readings)
+            </div>
+            <div class="modal-chart"><canvas id="modalChart"></canvas></div>
+          </div>
+          <div class="modal-section" style="margin-bottom: 0">
+            <div class="modal-section-title">Quick Actions</div>
+            <div class="modal-actions" id="modalActions"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+     JAVASCRIPT
+     ============================================================ -->
+    <script>
+      /* ============================================================
+   SECTION 1 — BACKEND API CONFIG
+   Your backend runs at API_BASE. The dashboard polls /api/data
+   (latest reading) and /api/alerts every POLL_MS milliseconds.
+   All patient metadata (name, bed, etc.) lives in STATIC_PD —
+   your current backend is single-device so we map every reading
+   onto PT-001 (index 0). Add more entries here when you add more
+   ESP32 devices.
+   ============================================================ */
+      const API_BASE = "http://localhost:3000"; // ← change to your server IP/port
+      const POLL_MS = 1000; // polling interval in ms
+
+      // Static patient metadata — one entry per physical ESP32 device.
+      // The order here must match the order your backend identifies devices.
+      const STATIC_PD = [
+        {
+          id: "PT-001",
+          name: "Arjun Mehta",
+          av: "AM",
+          avc: "av1",
+          bed: "Bed 01",
+          age: 52,
+          ward: "Ward A",
+          diagnosis: "Post-op Hydrotherapy",
+        },
+        {
+          id: "PT-002",
+          name: "Priya Sharma",
+          av: "PS",
+          avc: "av2",
+          bed: "Bed 02",
+          age: 38,
+          ward: "Ward A",
+          diagnosis: "IV Antibiotics",
+        },
+        {
+          id: "PT-003",
+          name: "Ravi Kumar",
+          av: "RK",
+          avc: "av3",
+          bed: "Bed 03",
+          age: 67,
+          ward: "Ward A",
+          diagnosis: "Saline Infusion",
+        },
+        {
+          id: "PT-004",
+          name: "Neha Verma",
+          av: "NV",
+          avc: "av4",
+          bed: "Bed 04",
+          age: 44,
+          ward: "Ward A",
+          diagnosis: "Chemotherapy Drip",
+        },
+        {
+          id: "PT-005",
+          name: "Suresh Patel",
+          av: "SP",
+          avc: "av5",
+          bed: "Bed 05",
+          age: 71,
+          ward: "Ward A",
+          diagnosis: "Hydration Therapy",
+        },
+      ];
+
+      let lastSync = 0;
+      let connStatus = "disconnected";
+
+      /* ============================================================
+   SECTION 2 — LIVE STATE ARRAY  (S)
+   Seeded with safe fallback values. fetchLatest() overwrites
+   S[0] with real ESP32 data every POLL_MS milliseconds.
+   Additional devices would update S[1], S[2], etc.
+   ============================================================ */
+      const S = STATIC_PD.map((pd, i) => ({
+        ...pd,
+        status: "offline",
+        fluid: 0,
+        drip: 0,
+        clamp: false,
+        online: false,
+        lastSeen: new Date(0),
+        dripHistory: Array(10).fill(0),
+        fluidHistory: Array(10).fill(0),
+      }));
+
+      /* ============================================================
+   SECTION 1b — BACKEND POLLING
+   fetchLatest()  → GET /api/data   (single latest reading)
+   fetchAlerts()  → GET /api/alerts (recent WARNING/CRITICAL docs)
+
+   Your backend's analyzeData() already computes status + clamp,
+   so we trust those values directly. bubble==1 maps to "critical".
+   ============================================================ */
+
+      // Helper: map backend status string → dashboard status key
+      function mapStatus(backendStatus, online) {
+        if (!online) return "offline";
+        const s = (backendStatus || "").toUpperCase();
+        if (s === "CRITICAL") return "critical";
+        if (s === "WARNING") return "warning";
+        return "normal";
+      }
+
+      // Update connection indicator in the Connection Status panel
+      function setConnIndicator(state) {
+        connStatus = state;
+        const dot = document.getElementById("connDot");
+        const text = document.getElementById("connStatusText");
+        if (!dot || !text) return;
+        const map = {
+          connected: { cls: "conn-dot conn-ok", label: "Connected" },
+          disconnected: { cls: "conn-dot conn-warn", label: "Disconnected" },
+          error: { cls: "conn-dot conn-error", label: "Error" },
+        };
+        const cfg = map[state] || map.disconnected;
+        dot.className = cfg.cls;
+        text.textContent = cfg.label;
+      }
+
+      // Poll GET /api/data → update S[0] (your single ESP32 device)
+      async function fetchLatest() {
+        try {
+          const res = await fetch(`${API_BASE}/api/data`, {
+            signal: AbortSignal.timeout(4000),
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const d = await res.json();
+
+          // d = { fluid, drip, bubble, status, timestamp, _id, ... }
+          if (d && d.fluid != null) {
+            const s = S[0]; // device 0 → PT-001
+            const wasStatus = s.status;
+
+            s.fluid = Number(d.fluid) || 0;
+            s.drip = Number(d.drip) || 0;
+            s.clamp = d.status === "CRITICAL"; // your backend sets clamp on CRITICAL
+            s.online = true;
+            s.status = mapStatus(d.status, true);
+            s.lastSeen = d.timestamp ? new Date(d.timestamp) : new Date();
+
+            // Shift rolling history
+            s.fluidHistory.push(s.fluid);
+            s.fluidHistory.shift();
+            s.dripHistory.push(s.drip);
+            s.dripHistory.shift();
+
+            // Auto-generate dashboard alert when status worsens
+            if (wasStatus !== s.status && s.status !== "normal") {
+              updatePatientStatus(0, s.status);
+            }
+
+            lastSync = Date.now();
+            setConnIndicator("connected");
+            renderAll();
+          }
+        } catch (err) {
+          // Mark device offline if we can't reach the API
+          if (S[0].online) {
+            S[0].online = false;
+            S[0].status = "offline";
+            S[0].drip = 0;
+            renderAll();
+          }
+          setConnIndicator(
+            err.name === "TimeoutError" ? "disconnected" : "error",
+          );
+          console.warn("fetchLatest error:", err.message);
+        }
+      }
+
+      // Poll GET /api/alerts → hydrate the dashboard alerts panel from DB
+      async function fetchAlerts() {
+        try {
+          const res = await fetch(`${API_BASE}/api/alerts`, {
+            signal: AbortSignal.timeout(4000),
+          });
+          if (!res.ok) return;
+          const dbAlerts = await res.json(); // array of IVData docs
+
+          dbAlerts.forEach((doc) => {
+            const st = mapStatus(doc.status, true);
+            const key = `db-${doc._id}`;
+            if (alerts.find((a) => a.key === key)) return; // already shown
+
+            const t = new Date(doc.timestamp).toLocaleTimeString("en-IN", {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+            });
+            const msgs = {
+              critical: `${S[0].name}: CRITICAL — auto-clamp activated! (fluid: ${doc.fluid}%)`,
+              warning: `${S[0].name}: IV fluid low (${doc.fluid}%) — check required`,
+            };
+            alerts.unshift({
+              id: Date.parse(doc.timestamp) || Date.now(),
+              key,
+              status: st,
+              msg: msgs[st] || `${S[0].name}: Status update — ${doc.status}`,
+              time: t,
+              rawTime: new Date(doc.timestamp),
+              acked: false,
+            });
+          });
+          if (alerts.length > 40) alerts.length = 40;
+          updateAlertBadges();
+          renderAlertPanel();
+        } catch (err) {
+          console.warn("fetchAlerts error:", err.message);
+        }
+      }
+
+      // Start polling after DOM + init() run
+      function startPolling() {
+        fetchLatest(); // immediate first fetch
+        fetchAlerts();
+        setInterval(fetchLatest, POLL_MS);
+        setInterval(fetchAlerts, POLL_MS * 5); // alerts every 15 s is enough
+      }
+
+      /* ============================================================
+   SECTION 3 — APP STATE
+   ============================================================ */
+      let alerts = []; // Array of alert objects
+      let soundOn = false; // Alert sound toggle
+      let audioCtx = null; // Web Audio context (lazy init)
+      let activeFilter = "all"; // Current card filter
+      let searchQuery = ""; // Current search string
+      let focusMode = false; // Critical-only focus mode
+      let modalChart = null; // Chart.js instance inside modal
+      let dripChart = null; // Right-panel drip chart
+      let fluidChart = null; // Right-panel fluid chart
+      let activeModal = null; // Index of open modal patient
+      let currentPage = "dashboard"; // Active SPA page
+
+      /* ============================================================
+   SECTION 4 — AUDIO
+   ============================================================ */
+      function beep() {
+        try {
+          if (!audioCtx)
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          const o = audioCtx.createOscillator(),
+            g = audioCtx.createGain();
+          o.connect(g);
+          g.connect(audioCtx.destination);
+          o.type = "sine";
+          [880, 1100, 880].forEach((f, idx) => {
+            o.frequency.setValueAtTime(f, audioCtx.currentTime + idx * 0.2);
+          });
+          g.gain.setValueAtTime(0.28, audioCtx.currentTime);
+          g.gain.exponentialRampToValueAtTime(
+            0.001,
+            audioCtx.currentTime + 0.7,
+          );
+          o.start();
+          o.stop(audioCtx.currentTime + 0.7);
+        } catch (e) {}
+      }
+
+      /* ============================================================
+   SECTION 5 — UI HANDLERS
+   All button wiring lives here. No inline onclick needed.
+   ============================================================ */
+
+      // ── Sidebar toggle ──────────────────────────────────────────
+      (function initSidebar() {
+        const sb = document.getElementById("sidebar");
+        const mc = document.getElementById("mainContent");
+        const btn = document.getElementById("sidebarToggle");
+
+        // Restore persisted state
+        if (localStorage.getItem("sidebarCollapsed") === "1") {
+          sb.classList.add("collapsed");
+          mc.classList.add("sidebar-collapsed-main");
+        }
+
+        btn.addEventListener("click", () => {
+          const isNowCollapsed = sb.classList.toggle("collapsed");
+          mc.classList.toggle("sidebar-collapsed-main", isNowCollapsed);
+          localStorage.setItem("sidebarCollapsed", isNowCollapsed ? "1" : "0");
+        });
+      })();
+
+      // ── Dark mode ────────────────────────────────────────────────
+      function applyDark(dark) {
+        if (dark) {
+          document.body.setAttribute("data-dark", "");
+        } else {
+          document.body.removeAttribute("data-dark");
+        }
+        // Update moon/sun icon in both topbar and toolbar
+        const moonPath =
+          '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
+        const sunPath =
+          '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>';
+        const iconEl = document.getElementById("darkIcon");
+        if (iconEl) iconEl.innerHTML = dark ? sunPath : moonPath;
+        setTimeout(updateCharts, 50);
+      }
+
+      function toggleDark() {
+        const nowDark = !document.body.hasAttribute("data-dark");
+        localStorage.setItem("darkMode", nowDark ? "1" : "0");
+        applyDark(nowDark);
+      }
+
+      (function initDarkMode() {
+        // Wire topbar button
+        document
+          .getElementById("darkToggle")
+          .addEventListener("click", toggleDark);
+        // Wire toolbar button
+        document
+          .getElementById("darkBtn")
+          .addEventListener("click", toggleDark);
+        // Restore persisted preference
+        if (localStorage.getItem("darkMode") === "1") applyDark(true);
+      })();
+
+      // ── Sound toggle ─────────────────────────────────────────────
+      (function initSound() {
+        const btn = document.getElementById("soundBtn");
+        btn.addEventListener("click", () => {
+          soundOn = !soundOn;
+          btn.classList.toggle("active", soundOn);
+          btn.innerHTML = soundOn
+            ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg> Sound ON`
+            : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg> Sound OFF`;
+        });
+      })();
+
+      // ── Focus mode ───────────────────────────────────────────────
+      (function initFocusMode() {
+        document.getElementById("focusBtn").addEventListener("click", () => {
+          focusMode = !focusMode;
+          document.body.classList.toggle("focus-mode", focusMode);
+          const btn = document.getElementById("focusBtn");
+          btn.classList.toggle("active", focusMode);
+          btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> ${focusMode ? "Focus: ON" : "Focus: Critical"}`;
+        });
+      })();
+
+      // ── Notification bell → scroll to alerts ────────────────────
+      (function initNotifBtn() {
+        document.getElementById("notifBtn").addEventListener("click", () => {
+          const alertPanel = document.getElementById("alertList");
+          if (!alertPanel) return;
+          // If not on dashboard, navigate there first
+          if (currentPage !== "dashboard")
+            setPage(
+              document.querySelector('.nav-item[data-page="dashboard"]'),
+              "dashboard",
+            );
+          // Wait one frame for page to show, then scroll + flash
+          requestAnimationFrame(() => {
+            alertPanel
+              .closest(".panel")
+              .scrollIntoView({ behavior: "smooth", block: "center" });
+            alertPanel.closest(".panel").style.outline =
+              "2px solid var(--primary)";
+            alertPanel.closest(".panel").style.transition = "outline 0s";
+            setTimeout(() => {
+              alertPanel.closest(".panel").style.outline = "none";
+            }, 1400);
+          });
+        });
+      })();
+
+      // ── Live search ──────────────────────────────────────────────
+      (function initSearch() {
+        document
+          .getElementById("searchInput")
+          .addEventListener("input", (e) => {
+            searchQuery = e.target.value.toLowerCase().trim();
+            renderGrid();
+          });
+      })();
+
+      // ── Ward tabs ────────────────────────────────────────────────
+      (function initWardTabs() {
+        document.querySelectorAll(".ward-tab").forEach((tab) => {
+          tab.addEventListener("click", () => {
+            document
+              .querySelectorAll(".ward-tab")
+              .forEach((t) => t.classList.remove("active"));
+            tab.classList.add("active");
+            const ward = tab.textContent.trim();
+            document.querySelector(".topbar-sub").textContent =
+              `${ward} — ICU Bay 1–5`;
+          });
+        });
+      })();
+
+      // ── Filter chips ─────────────────────────────────────────────
+      function filterCards(btn, filter) {
+        activeFilter = filter;
+        document
+          .querySelectorAll(".filter-chip")
+          .forEach((c) => c.classList.remove("active"));
+        btn.classList.add("active");
+        renderGrid();
+      }
+
+      /* ============================================================
+   SECTION 6 — SPA PAGE ROUTER
+   Shows/hides sections without reloading the page.
+   ============================================================ */
+
+      // Page view elements are built dynamically and injected into #pageView
+      const PAGE_TITLES = {
+        dashboard: "IV Drip Monitor",
+        patients: "All Patients",
+        alerts: "Live Alerts",
+        vitals: "Vitals & Charts",
+        reports: "Reports",
+        settings: "Settings",
+      };
+
+      // Pages that share the main .content wrapper vs dedicated views
+      const DASHBOARD_PAGES = new Set(["dashboard"]);
+
+      function setPage(btn, page) {
+        // Update active nav state
+        document
+          .querySelectorAll(".nav-item")
+          .forEach((n) => n.classList.remove("active"));
+        if (btn) btn.classList.add("active");
+        currentPage = page;
+
+        const content = document.querySelector(".content");
+        const dashLayout = document.getElementById("dashboardLayout"); // wrapper we'll create on first run
+        const pageView = document.getElementById("pageView");
+
+        // Lazily create #dashboardLayout wrapping the existing content on first navigation
+        if (!dashLayout) {
+          // Wrap everything inside .content with an id so we can show/hide it
+          const wrapper = document.createElement("div");
+          wrapper.id = "dashboardLayout";
+          // Move all current children into the wrapper
+          while (content.firstChild) wrapper.appendChild(content.firstChild);
+          content.appendChild(wrapper);
+
+          // Create the alternate page view container
+          const pv = document.createElement("div");
+          pv.id = "pageView";
+          pv.style.cssText = "display:none;";
+          content.appendChild(pv);
+        }
+
+        const dl = document.getElementById("dashboardLayout");
+        const pv = document.getElementById("pageView");
+
+        if (page === "dashboard") {
+          dl.style.display = "";
+          pv.style.display = "none";
+          pv.innerHTML = "";
+          renderGrid(); // re-apply any active filter
+          updateCharts();
+          return;
+        }
+
+        // All non-dashboard pages hide the main grid and render into #pageView
+        dl.style.display = "none";
+        pv.style.display = "";
+
+        switch (page) {
+          case "patients":
+            renderPagePatients(pv);
+            break;
+          case "alerts":
+            renderPageAlerts(pv);
+            break;
+          case "vitals":
+            renderPageVitals(pv);
+            break;
+          case "reports":
+            renderPagePlaceholder(
+              pv,
+              "Reports",
+              "Shift summaries and discharge reports will appear here once connected to the hospital HIS.",
+            );
+            break;
+          case "settings":
+            renderPagePlaceholder(
+              pv,
+              "Settings",
+              "System configuration for ESP32 endpoints, alert thresholds, sound, and user preferences.",
+            );
+            break;
+          default:
+            renderPagePlaceholder(pv, page, "Page content coming soon.");
+            break;
+        }
+      }
+
+      // Wire sidebar nav items — add data-page attribute support
+      (function initNavItems() {
+        document.querySelectorAll(".nav-item[data-tip]").forEach((btn) => {
+          const tip = btn.getAttribute("data-tip");
+          const page =
+            btn
+              .getAttribute("onclick")
+              ?.match(/setPage\(this,'(\w+)'\)/)?.[1] ?? tip.toLowerCase();
+          btn.removeAttribute("onclick");
+          btn.setAttribute("data-page", page);
+          btn.addEventListener("click", () => setPage(btn, page));
+        });
+      })();
+
+      /* ── Page: Patients (full-width grid, no right panel) ──────── */
+      function renderPagePatients(container) {
+        container.innerHTML = `
+    <div class="section-head" style="margin-bottom:16px">
+      <h3>All Patients — ${document.querySelector(".ward-tab.active")?.textContent ?? "Ward A"}</h3>
+      <span>${S.length} patients registered</span>
+    </div>
+    <div class="patients-grid" id="pagePatientGrid" style="grid-template-columns:repeat(auto-fill,minmax(290px,1fr))"></div>
+  `;
+        const grid = container.querySelector("#pagePatientGrid");
+        grid.innerHTML = S.map((s, i) => cardHTML(s, i)).join("");
+      }
+
+      /* ── Page: Alerts (expanded alert list) ────────────────────── */
+      function renderPageAlerts(container) {
+        const unacked = alerts.filter((a) => !a.acked);
+        const sorted = [...unacked].sort(
+          (a, b) =>
+            (({ critical: 0, warning: 1, normal: 2, offline: 3 })[a.status] ??
+              4) -
+            ({ critical: 0, warning: 1, normal: 2, offline: 3 }[b.status] ?? 4),
+        );
+
+        container.innerHTML = `
+    <div class="section-head" style="margin-bottom:16px">
+      <h3>Live Alerts</h3>
+      <button style="font-size:.7rem;color:var(--primary);font-weight:700;border:none;background:none;cursor:pointer" id="pageAckAll">Clear Acknowledged</button>
+    </div>
+    <div class="panel" style="max-width:700px">
+      <div class="alert-list" style="max-height:none">
+        ${sorted.length ? sorted.map((a) => alertItemHTML(a)).join("") : '<div class="no-alerts"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/></svg>No active alerts</div>'}
+      </div>
+    </div>
+  `;
+        container
+          .querySelector("#pageAckAll")
+          ?.addEventListener("click", () => {
+            alerts = alerts.filter((a) => !a.acked);
+            renderPageAlerts(container);
+            updateAlertBadges();
+          });
+        // Wire per-alert ACK buttons
+        container.querySelectorAll(".alert-ack").forEach((btn) => {
+          btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            ackAlert(parseInt(btn.dataset.id));
+            renderPageAlerts(container);
+          });
+        });
+      }
+
+      /* ── Page: Vitals (full-width charts) ──────────────────────── */
+      function renderPageVitals(container) {
+        container.innerHTML = `
+    <div class="section-head" style="margin-bottom:16px">
+      <h3>Vitals & Charts</h3>
+      <span>Live readings from all connected devices</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="panel">
+        <div class="panel-hd"><div class="panel-title"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Drip Rate Trend</div><span style="font-size:.68rem;color:var(--muted);font-family:var(--mono)">drops/min</span></div>
+        <div style="position:relative;height:220px"><canvas id="pageChartDrip"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="panel-hd"><div class="panel-title"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>Fluid Levels</div><span style="font-size:.68rem;color:var(--muted);font-family:var(--mono)">% remaining</span></div>
+        <div style="position:relative;height:220px"><canvas id="pageChartFluid"></canvas></div>
+      </div>
+    </div>
+  `;
+
+        const { grid, text, colors } = getChartColors();
+        const labels = Array.from(
+          { length: 10 },
+          (_, i) => `-${(9 - i) * 2.5}s`,
+        );
+
+        new Chart(container.querySelector("#pageChartDrip"), {
+          type: "line",
+          data: {
+            labels,
+            datasets: S.map((s, i) => ({
+              label: s.name,
+              data: [...s.dripHistory],
+              borderColor: colors[i],
+              backgroundColor: colors[i] + "22",
+              borderWidth: 1.5,
+              pointRadius: 2,
+              tension: 0.4,
+              fill: false,
+            })),
+          },
+          options: chartOptions("drops/min", grid, text),
+        });
+
+        new Chart(container.querySelector("#pageChartFluid"), {
+          type: "bar",
+          data: {
+            labels: S.map((s) => s.av),
+            datasets: [
+              {
+                label: "Fluid %",
+                data: S.map((s) => Math.round(s.fluid)),
+                backgroundColor: S.map((s) =>
+                  s.fluid > 50
+                    ? "#0d9f5a44"
+                    : s.fluid > 20
+                      ? "#c9700a44"
+                      : "#c9202a44",
+                ),
+                borderColor: S.map((s) =>
+                  s.fluid > 50
+                    ? "#0d9f5a"
+                    : s.fluid > 20
+                      ? "#c9700a"
+                      : "#c9202a",
+                ),
+                borderWidth: 1.5,
+                borderRadius: 6,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: {
+                grid: { color: grid },
+                ticks: { color: text, font: { size: 10 } },
+              },
+              y: {
+                grid: { color: grid },
+                ticks: { color: text, font: { size: 9 } },
+                min: 0,
+                max: 100,
+              },
+            },
+          },
+        });
+      }
+
+      /* ── Page: Placeholder ─────────────────────────────────────── */
+      function renderPagePlaceholder(container, title, msg) {
+        container.innerHTML = `
+    <div class="section-head" style="margin-bottom:20px"><h3>${title}</h3></div>
+    <div class="panel" style="max-width:560px;padding:36px 28px;text-align:center">
+      <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="var(--muted2)" stroke-width="1.5" style="display:block;margin:0 auto 16px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      <p style="font-size:.88rem;color:var(--muted);line-height:1.7;max-width:340px;margin:0 auto">${msg}</p>
+    </div>
+  `;
+      }
+
+      /* ============================================================
+   SECTION 7 — PATIENT STATUS MANAGEMENT
+   Called by modal Quick Actions. ESP32 would call these too.
+   ============================================================ */
+      function updatePatientStatus(idx, st) {
+        const s = S[idx];
+        s.status = st;
+        s.lastSeen = new Date();
+
+        // if (st === 'normal') {
+        //   s.pressure = 'Normal'; s.clamp = false; s.online = true;
+        //   s.drip = 22;
+        // } else if (st === 'warning') {
+        //   s.pressure = 'Elevated'; s.clamp = false; s.online = true;
+        // } else if (st === 'critical') {
+        //   s.pressure = 'Critical'; s.clamp = true; s.online = true;
+        //   s.drip = 5;
+        // } else if (st === 'offline') {
+        //   s.pressure = 'Unknown'; s.online = false; s.drip = 0;
+        // }
+
+        const t = new Date().toLocaleTimeString("en-IN", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+        const key = `${idx}-${st}`;
+
+        // Debounce: skip duplicate within 5 s
+        const recent = alerts.find(
+          (a) => a.key === key && Date.now() - new Date(a.rawTime) < 5000,
+        );
+        if (!recent) {
+          const msgs = {
+            normal: `${s.name}: IV flow restored to normal`,
+            warning: `${s.name}: IV fluid low (${Math.round(s.fluid)}%) — check required`,
+            critical: `${s.name}: CRITICAL — auto-clamp activated!`,
+            offline: `${s.name}: Device disconnected — no signal`,
+          };
+          alerts.unshift({
+            id: Date.now(),
+            key,
+            status: st,
+            msg: msgs[st],
+            time: t,
+            rawTime: new Date(),
+            acked: false,
+          });
+          if (alerts.length > 40) alerts.pop();
+          if (soundOn && st === "critical") beep();
+        }
+
+        renderAll();
+      }
+
+      function replaceBag(idx) {
+        const s = S[idx];
+        s.fluid = 100;
+        s.status = "normal";
+        s.clamp = false;
+        s.drip = 22;
+        // s.pressure = 'Normal';
+        s.online = true;
+        s.lastSeen = new Date();
+        showToast(`Bag replaced for ${s.name}`, "ok");
+        renderAll();
+      }
+
+      function disconnectDevice(idx) {
+        updatePatientStatus(idx, "offline");
+      }
+
+      /* ============================================================
+   SECTION 8 — ALERT HELPERS
+   ============================================================ */
+      function alertItemHTML(a) {
+        return `
+    <div class="alert-item ai-${a.status}" id="alert-${a.id}">
+      <div class="alert-dot"></div>
+      <div class="alert-body">
+        <div class="alert-msg">${a.msg}</div>
+        <div class="alert-time">${a.time}</div>
+      </div>
+      <button class="alert-ack" data-id="${a.id}">ACK</button>
+    </div>`;
+      }
+
+      function ackAlert(id) {
+        const a = alerts.find((x) => x.id === id);
+        if (a) a.acked = true;
+        updateAlertBadges();
+        renderAlertPanel();
+      }
+
+      function clearAcknowledged() {
+        alerts = alerts.filter((a) => !a.acked);
+        updateAlertBadges();
+        renderAlertPanel();
+      }
+
+      function updateAlertBadges() {
+        const count = alerts.filter((a) => !a.acked).length;
+        const critCount = alerts.filter(
+          (a) => !a.acked && a.status === "critical",
+        ).length;
+        const display = critCount || count;
+        const bd = document.getElementById("alertBadge");
+        const sb = document.getElementById("sidebarBadge");
+        const nd = document.getElementById("notifDot");
+        if (bd) bd.textContent = display;
+        if (sb) sb.textContent = display;
+        if (nd) nd.style.display = display ? "block" : "none";
+      }
+
+      /* ============================================================
+   SECTION 9 — RENDER FUNCTIONS
+   ============================================================ */
+
+      // ── Colour helpers ────────────────────────────────────────────
+      function fc(p) {
+        return p > 50 ? "var(--ok)" : p > 20 ? "var(--warn)" : "var(--crit)";
+      }
+      function pc(p) {
+        return p === "Normal"
+          ? "var(--ok)"
+          : p === "Elevated"
+            ? "var(--warn)"
+            : "var(--crit)";
+      }
+      function ps(p) {
+        return p === "Normal"
+          ? "NRM"
+          : p === "Elevated"
+            ? "HIGH"
+            : p === "Unknown"
+              ? "N/A"
+              : "CRIT";
+      }
+      function ago(d) {
+        const sec = Math.round((Date.now() - new Date(d)) / 1000);
+        if (sec < 5) return "just now";
+        if (sec < 60) return `${sec}s ago`;
+        return `${Math.floor(sec / 60)}m ago`;
+      }
+
+      // ── Patient card HTML ─────────────────────────────────────────
+      function cardHTML(s, i) {
+        const p = Math.round(s.fluid);
+        const online = s.online && s.status !== "offline";
+        return `
+<div class="patient-card s-${s.status}" data-idx="${i}">
+  <div class="card-hd">
+    <div class="card-pat">
+      <div class="pat-av ${s.avc}">${s.av}</div>
+      <div>
+        <div class="pat-name">${s.name}</div>
+        <div class="pat-meta">${s.id} · ${s.bed}</div>
+      </div>
+    </div>
+    <div class="card-badges">
+      <span class="status-pill p-${s.status}">${s.status}</span>
+      <span class="live-badge">
+        <div class="live-dot ${online ? "live" : "offline"}"></div>
+        ${online ? "LIVE" : "OFFLINE"}
+      </span>
+    </div>
+  </div>
+  <div class="fluid-sec">
+    <div class="fluid-row">
+      <span class="fluid-lbl">IV Fluid Level</span>
+      <span class="fluid-val" style="color:${fc(p)}">${p}%</span>
+    </div>
+    <div class="fluid-track">
+      <div class="fluid-fill" style="width:${p}%;background:${fc(p)}"></div>
+    </div>
+  </div>
+  <div class="card-metrics">
+    <div class="metric-cell">
+      <div class="metric-val" style="color:${fc(p)}">${online ? Math.round(s.drip) : "—"}</div>
+      <div class="metric-lbl">drops/min</div>
+    </div>
+
+    <div class="metric-cell">
+      <div class="metric-val" style="color:${s.clamp ? "var(--crit)" : "var(--ok)"}">${s.clamp ? "ON" : "OFF"}</div>
+      <div class="metric-lbl">Clamp</div>
+    </div>
+  </div>
+  <div class="card-ft">
+    <div class="clamp-status">
+      <div class="clamp-dot" style="background:${s.clamp ? "var(--crit)" : "var(--ok)"}"></div>
+      Auto-Clamp ${s.clamp ? "Active" : "Standby"}
+    </div>
+    <div class="last-update">${ago(s.lastSeen)}</div>
+  </div>
+</div>`;
+      }
+
+      // ── Grid render (with filter + search) ───────────────────────
+      function renderGrid() {
+        const grid = document.getElementById("grid");
+        if (!grid) return;
+
+        let visible = S.map((s, i) => ({ s, i }));
+        if (activeFilter !== "all")
+          visible = visible.filter(({ s }) => s.status === activeFilter);
+        if (searchQuery)
+          visible = visible.filter(
+            ({ s }) =>
+              s.name.toLowerCase().includes(searchQuery) ||
+              s.id.toLowerCase().includes(searchQuery) ||
+              s.bed.toLowerCase().includes(searchQuery),
+          );
+
+        grid.innerHTML = visible.length
+          ? visible.map(({ s, i }) => cardHTML(s, i)).join("")
+          : `<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);font-size:.85rem">No patients match your filter.</div>`;
+
+        document.getElementById("gridCount").textContent =
+          `${visible.length} patient${visible.length !== 1 ? "s" : ""}`;
+
+        // Wire card click → open modal
+        grid.querySelectorAll(".patient-card").forEach((card) => {
+          card.addEventListener("click", () =>
+            openModal(parseInt(card.dataset.idx)),
+          );
+        });
+      }
+
+      // ── Alert panel render ────────────────────────────────────────
+      function renderAlertPanel() {
+        const el = document.getElementById("alertList");
+        if (!el) return;
+
+        const unacked = alerts.filter((a) => !a.acked);
+        const sorted = [...unacked].sort(
+          (a, b) =>
+            (({ critical: 0, warning: 1, normal: 2, offline: 3 })[a.status] ??
+              4) -
+            ({ critical: 0, warning: 1, normal: 2, offline: 3 }[b.status] ?? 4),
+        );
+
+        el.innerHTML = sorted.length
+          ? sorted
+              .slice(0, 15)
+              .map((a) => alertItemHTML(a))
+              .join("")
+          : `<div class="no-alerts"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/></svg>No active alerts</div>`;
+
+        // Wire ACK buttons inside dashboard panel
+        el.querySelectorAll(".alert-ack").forEach((btn) => {
+          btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            ackAlert(parseInt(btn.dataset.id));
+          });
+        });
+      }
+
+      // ── Summary stats render ──────────────────────────────────────
+      function renderSummary() {
+        const n = S.filter((s) => s.status === "normal").length;
+        const w = S.filter((s) => s.status === "warning").length;
+        const c = S.filter((s) => s.status === "critical").length;
+        const t = S.length;
+        document.getElementById("cntN").textContent = n;
+        document.getElementById("cntW").textContent = w;
+        document.getElementById("cntC").textContent = c;
+        document.getElementById("pctN").textContent =
+          Math.round((n / t) * 100) + "% stable";
+        document.getElementById("pctW").textContent =
+          Math.round((w / t) * 100) + "% of patients";
+        document.getElementById("pctC").textContent =
+          Math.round((c / t) * 100) + "% need attention";
+      }
+
+      // ── Master render (called once per data update) ───────────────
+      function renderAll() {
+        renderGrid();
+        renderAlertPanel();
+        renderSummary();
+        updateAlertBadges();
+        updateCharts();
+        if (activeModal !== null) populateModal(activeModal);
+      }
+
+      /* ============================================================
+   SECTION 10 — CHARTS
+   ============================================================ */
+      function getChartColors() {
+        const dark = document.body.hasAttribute("data-dark");
+        return {
+          grid: dark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)",
+          text: dark ? "#6b7fa0" : "#9aa6bf",
+          colors: ["#1a56db", "#0d9f5a", "#c9700a", "#db2777", "#7c3aed"],
+        };
+      }
+
+      function chartOptions(yLabel, grid, text) {
+        return {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 400 },
+          plugins: {
+            legend: {
+              display: true,
+              position: "bottom",
+              labels: {
+                color: text,
+                font: { size: 10, family: "'DM Sans'" },
+                boxWidth: 8,
+                padding: 8,
+              },
+            },
+            tooltip: {
+              callbacks: {
+                label: (ctx) =>
+                  ` ${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)} ${yLabel}`,
+              },
+            },
+          },
+          scales: {
+            x: {
+              grid: { color: grid },
+              ticks: { color: text, font: { size: 9 }, maxTicksLimit: 6 },
+            },
+            y: {
+              grid: { color: grid },
+              ticks: { color: text, font: { size: 9 } },
+              beginAtZero: false,
+            },
+          },
+        };
+      }
+
+      function initCharts() {
+        const { grid, text, colors } = getChartColors();
+        const labels = Array.from(
+          { length: 10 },
+          (_, i) => `-${(9 - i) * 2.5}s`,
+        );
+
+        dripChart = new Chart(document.getElementById("dripChart"), {
+          type: "line",
+          data: {
+            labels,
+            datasets: S.map((s, i) => ({
+              label: s.av,
+              data: [...s.dripHistory],
+              borderColor: colors[i],
+              backgroundColor: colors[i] + "22",
+              borderWidth: 1.5,
+              pointRadius: 0,
+              tension: 0.4,
+              fill: false,
+            })),
+          },
+          options: chartOptions("drops/min", grid, text),
+        });
+
+        fluidChart = new Chart(document.getElementById("fluidChart"), {
+          type: "bar",
+          data: {
+            labels: S.map((s) => s.av),
+            datasets: [
+              {
+                label: "Fluid %",
+                data: S.map((s) => Math.round(s.fluid)),
+                backgroundColor: S.map((s) =>
+                  s.fluid > 50
+                    ? "#0d9f5a44"
+                    : s.fluid > 20
+                      ? "#c9700a44"
+                      : "#c9202a44",
+                ),
+                borderColor: S.map((s) =>
+                  s.fluid > 50
+                    ? "#0d9f5a"
+                    : s.fluid > 20
+                      ? "#c9700a"
+                      : "#c9202a",
+                ),
+                borderWidth: 1.5,
+                borderRadius: 6,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: {
+                grid: { color: grid },
+                ticks: { color: text, font: { size: 10 } },
+              },
+              y: {
+                grid: { color: grid },
+                ticks: { color: text, font: { size: 9 } },
+                min: 0,
+                max: 100,
+              },
+            },
+          },
+        });
+      }
+
+      function updateCharts() {
+        if (!dripChart || !fluidChart) return;
+        const { grid, text, colors } = getChartColors();
+
+        dripChart.data.datasets.forEach((ds, i) => {
+          ds.data = [...S[i].dripHistory];
+          ds.borderColor = colors[i];
+          ds.backgroundColor = colors[i] + "22";
+        });
+        ["x", "y"].forEach((ax) => {
+          dripChart.options.scales[ax].grid.color = grid;
+          dripChart.options.scales[ax].ticks.color = text;
+        });
+        dripChart.options.plugins.legend.labels.color = text;
+        dripChart.update("none");
+
+        fluidChart.data.datasets[0].data = S.map((s) => Math.round(s.fluid));
+        fluidChart.data.datasets[0].backgroundColor = S.map((s) =>
+          s.fluid > 50 ? "#0d9f5a44" : s.fluid > 20 ? "#c9700a44" : "#c9202a44",
+        );
+        fluidChart.data.datasets[0].borderColor = S.map((s) =>
+          s.fluid > 50 ? "#0d9f5a" : s.fluid > 20 ? "#c9700a" : "#c9202a",
+        );
+        ["x", "y"].forEach((ax) => {
+          fluidChart.options.scales[ax].grid.color = grid;
+          fluidChart.options.scales[ax].ticks.color = text;
+        });
+        fluidChart.update("none");
+      }
+
+      /* ============================================================
+   SECTION 11 — MODAL (Patient Detail)
+   ============================================================ */
+      function openModal(i) {
+        activeModal = i;
+        populateModal(i);
+        document.getElementById("modalOverlay").classList.add("open");
+      }
+
+      function closeModalDirect() {
+        document.getElementById("modalOverlay").classList.remove("open");
+        activeModal = null;
+        if (modalChart) {
+          modalChart.destroy();
+          modalChart = null;
+        }
+      }
+
+      // Close by clicking backdrop
+      document.getElementById("modalOverlay").addEventListener("click", (e) => {
+        if (e.target === document.getElementById("modalOverlay"))
+          closeModalDirect();
+      });
+
+      // Close button inside modal
+      document
+        .getElementById("modalCloseBtn")
+        .addEventListener("click", closeModalDirect);
+
+      function populateModal(i) {
+        const s = S[i];
+        const p = Math.round(s.fluid);
+
+        document.getElementById("modalAv").className = "pat-av " + s.avc;
+        document.getElementById("modalAv").textContent = s.av;
+        document.getElementById("modalName").textContent = s.name;
+        document.getElementById("modalMeta").textContent =
+          `${s.id} · ${s.bed} · Age ${s.age} · ${s.diagnosis}`;
+
+        document.getElementById("modalMetrics").innerHTML = `
+    <div class="modal-cell"><div class="modal-cell-val" style="color:${fc(p)}">${p}%</div><div class="modal-cell-lbl">Fluid Level</div></div>
+    <div class="modal-cell"><div class="modal-cell-val" style="color:${fc(p)}">${s.online ? Math.round(s.drip) : "—"}</div><div class="modal-cell-lbl">Drops/min</div></div>
+   
+    <div class="modal-cell"><div class="modal-cell-val" style="color:${s.clamp ? "var(--crit)" : "var(--ok)"}">${s.clamp ? "ON" : "OFF"}</div><div class="modal-cell-lbl">Clamp</div></div>
+    <div class="modal-cell"><div class="modal-cell-val" style="color:${s.online ? "var(--ok)" : "var(--offline)"}">${s.online ? "Live" : "Offline"}</div><div class="modal-cell-lbl">Connection</div></div>
+    <div class="modal-cell"><div class="modal-cell-val">${ago(s.lastSeen)}</div><div class="modal-cell-lbl">Last Update</div></div>
+  `;
+
+        // Quick actions — bound by JS, no inline onclick
+        const actionsEl = document.getElementById("modalActions");
+        actionsEl.innerHTML = `
+    <button class="modal-btn modal-btn-ok" id="maNormal">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>Mark Normal
+    </button>
+    <button class="modal-btn modal-btn-reset" id="maReplace">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>Replace Bag
+    </button>
+    <button class="modal-btn modal-btn-primary" id="maDisc">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/></svg>Disconnect
+    </button>
+  `;
+        document.getElementById("maNormal").onclick = () => {
+          updatePatientStatus(i, "normal");
+          closeModalDirect();
+        };
+        document.getElementById("maReplace").onclick = () => {
+          replaceBag(i);
+          closeModalDirect();
+        };
+        document.getElementById("maDisc").onclick = () => {
+          disconnectDevice(i);
+          closeModalDirect();
+        };
+
+        // Modal chart — dual axis fluid + drip
+        if (modalChart) {
+          modalChart.destroy();
+          modalChart = null;
+        }
+        const { grid, text } = getChartColors();
+        modalChart = new Chart(document.getElementById("modalChart"), {
+          type: "line",
+          data: {
+            labels: Array.from({ length: 10 }, (_, j) => `-${(9 - j) * 2.5}s`),
+            datasets: [
+              {
+                label: "Fluid %",
+                data: [...s.fluidHistory],
+                borderColor: "#1a56db",
+                backgroundColor: "#1a56db22",
+                borderWidth: 2,
+                pointRadius: 2,
+                tension: 0.4,
+                fill: true,
+                yAxisID: "y1",
+              },
+              {
+                label: "Drip",
+                data: [...s.dripHistory],
+                borderColor: "#0d9f5a",
+                backgroundColor: "#0d9f5a22",
+                borderWidth: 2,
+                pointRadius: 2,
+                tension: 0.4,
+                fill: false,
+                yAxisID: "y2",
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 400 },
+            plugins: {
+              legend: {
+                display: true,
+                position: "bottom",
+                labels: {
+                  color: text,
+                  font: { size: 10 },
+                  boxWidth: 8,
+                  padding: 8,
+                },
+              },
+            },
+            scales: {
+              x: {
+                grid: { color: grid },
+                ticks: { color: text, font: { size: 9 } },
+              },
+              y1: {
+                grid: { color: grid },
+                ticks: { color: text, font: { size: 9 } },
+                position: "left",
+                min: 0,
+                max: 100,
+              },
+              y2: {
+                grid: { display: false },
+                ticks: { color: text, font: { size: 9 } },
+                position: "right",
+                min: 0,
+                max: 40,
+              },
+            },
+          },
+        });
+      }
+
+      /* ============================================================
+   SECTION 12 — TOAST NOTIFICATIONS
+   ============================================================ */
+      function showToast(msg, type = "info") {
+        let container = document.getElementById("toastContainer");
+        if (!container) {
+          container = document.createElement("div");
+          container.id = "toastContainer";
+          container.style.cssText =
+            "position:fixed;bottom:24px;right:24px;display:flex;flex-direction:column;gap:8px;z-index:9999";
+          document.body.appendChild(container);
+        }
+        const el = document.createElement("div");
+        const bg =
+          type === "ok"
+            ? "var(--ok-bg)"
+            : type === "crit"
+              ? "var(--crit-bg)"
+              : "var(--surface)";
+        const bc =
+          type === "ok"
+            ? "var(--ok-border)"
+            : type === "crit"
+              ? "var(--crit-border)"
+              : "var(--border)";
+        const c =
+          type === "ok"
+            ? "var(--ok)"
+            : type === "crit"
+              ? "var(--crit)"
+              : "var(--text)";
+        el.style.cssText = `background:${bg};border:1px solid ${bc};color:${c};padding:10px 16px;border-radius:12px;font-size:.8rem;font-weight:600;box-shadow:var(--shadow-md);animation:slideIn .25s ease;max-width:280px;font-family:var(--font)`;
+        el.textContent = msg;
+        container.appendChild(el);
+        setTimeout(() => {
+          el.style.opacity = "0";
+          el.style.transform = "translateX(10px)";
+          el.style.transition = "all .3s";
+          setTimeout(() => el.remove(), 300);
+        }, 2800);
+      }
+
+      /* ============================================================
+   SECTION 13 — CLOCK
+   ============================================================ */
+      function tickTime() {
+        const n = new Date();
+        const t = n.toLocaleTimeString("en-IN", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+        const el = document.getElementById("topClock");
+        const ct = document.getElementById("connTime");
+        const gw = document.getElementById("gwSyncTime");
+        if (el) el.textContent = t;
+        if (ct) ct.textContent = t;
+        if (gw)
+          gw.textContent = n.toLocaleTimeString("en-IN", {
+            hour: "2-digit",
+            minute: "2-digit",
+          });
+        // Refresh "ago" timestamps on visible cards without full re-render
+        document.querySelectorAll(".last-update").forEach((el, idx) => {
+          const card = el.closest(".patient-card");
+          if (!card) return;
+          const i = parseInt(card.dataset.idx);
+          if (!isNaN(i) && S[i]) el.textContent = ago(S[i].lastSeen);
+        });
+      }
+
+      /* ============================================================
+   SECTION 14 — INIT
+   Run once on DOMContentLoaded
+   ============================================================ */
+      (function init() {
+        // Render immediately (no fake skeleton delay — data is ready)
+        renderAll();
+
+        // Seed one startup alert per non-normal patient so alerts panel isn't empty
+        S.forEach((s, i) => {
+          if (s.status !== "normal") {
+            const t = new Date().toLocaleTimeString("en-IN", {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+            });
+            alerts.push({
+              id: Date.now() + i,
+              key: `${i}-${s.status}-init`,
+              status: s.status,
+              msg:
+                s.status === "warning"
+                  ? `${s.name}: IV fluid low (${Math.round(s.fluid)}%) — check required`
+                  : s.status === "critical"
+                    ? `${s.name}: CRITICAL — auto-clamp activated!`
+                    : `${s.name}: Device offline — no signal`,
+              time: t,
+              rawTime: new Date(),
+              acked: false,
+            });
+          }
+        });
+        updateAlertBadges();
+        renderAlertPanel();
+
+        // Wire "Clear Ack'd" button in dashboard alerts panel
+        document
+          .getElementById("clearAckBtn")
+          ?.addEventListener("click", clearAcknowledged);
+
+        // Charts init (after DOM is painted)
+        setTimeout(() => {
+          initCharts();
+        }, 100);
+
+        // Clock ticks every second
+        setInterval(tickTime, 1000);
+        tickTime();
+
+        // Start backend polling — replaces simulation with real ESP32 data
+        startPolling();
+      })();
+    </script>
+  </body>
+</html>
