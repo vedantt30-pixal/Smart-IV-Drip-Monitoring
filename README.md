@@ -140,7 +140,7 @@ nodemon server.js
 
 ## 👨‍💻 Author
 
-**Abeer Sharif**
+**Vedant Mhaskar**
 Electronics and Computer science student
 
 *An IoT-based healthcare solution that combines embedded hardware and web technologies to improve patient care through automated IV drip monitoring.*
