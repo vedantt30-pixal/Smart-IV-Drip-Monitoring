@@ -26,7 +26,7 @@
 // ============================================================
 const char* WIFI_SSID  = "your_wifi";
 const char* WIFI_PASS  = "your_wifi_password";
-const char* SERVER_URL = "Backend_api_url";
+const char* SERVER_URL = "https://smart-iv-drip-monitoring.onrender.com/api/data";
 
 const unsigned long POST_INTERVAL = 3000;
 unsigned long lastPostTime        = 0;
